@@ -5,7 +5,6 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    naersk.url = "github:nmattia/naersk";
   };
 
   outputs =
@@ -13,37 +12,32 @@
     , nixpkgs
     , flake-utils
     , rust-overlay
-    , naersk
     } @ inputs:
     flake-utils.lib.eachDefaultSystem (system:
     let
-      overlays = [ (import rust-overlay) ];
+      overlays = [
+        (import rust-overlay)
+        (final: prev: {
+          rust-toolchain =
+            (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain).override {
+              extensions = [ "rust-src" ];
+            };
+        })
+      ];
 
       pkgs = import nixpkgs {
         inherit system overlays;
       };
-
-      rust-toolchain =
-        (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain).override {
-          extensions = [ "rust-src" ];
-        };
-
-      # Override the version used in naersk
-      naersk-lib = naersk.lib."${system}".override {
-        rustc = rust-toolchain;
-      };
-
-      format-pkgs = with pkgs; [
-        nixpkgs-fmt
-      ];
     in
     rec
     {
-      packages.tomat = naersk-lib.buildPackage {
+      packages.tomat = pkgs.rustPlatform.buildRustPackage {
         pname = "tomat";
-        root = ./.;
-        nativeBuildInputs = with pkgs; [
-        ];
+        version = "0.1.0";
+
+        src = ./.;
+
+        cargoSha256 = "sha256-QoI3RRCLc348swpHXXkUkcK47AQBB7ZpBiuSX4OfG1k=";
       };
       defaultPackage = packages.tomat;
 
@@ -55,13 +49,14 @@
       devShell = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
           rust-toolchain
-        ] ++ format-pkgs;
+          nixpkgs-fmt
+        ];
       };
 
       checks = {
         format = pkgs.runCommand
           "check-nix-format"
-          { buildInputs = format-pkgs; }
+          { buildInputs = with pkgs; [ nixpkgs-fmt ]; }
           ''
             ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check ${./.}
             touch $out
