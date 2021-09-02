@@ -22,6 +22,7 @@
             (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain).override {
               extensions = [ "rust-src" ];
             };
+            rustfmt = pkgs.rust-bin.nightly.latest.rustfmt;
         })
       ];
 
@@ -48,6 +49,7 @@
 
       devShell = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
+          rustfmt
           rust-toolchain
           nixpkgs-fmt
         ];
