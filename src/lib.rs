@@ -1,10 +1,10 @@
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 
 use poise::{
-    defaults::HelpResponseMode, serenity_prelude as serenity, EditTracker, ErrorContext, Framework,
-    FrameworkOptions, PrefixFrameworkOptions,
+    serenity_prelude as serenity, EditTracker, ErrorContext, Framework, FrameworkOptions,
+    PrefixFrameworkOptions,
 };
-use serenity::{ApplicationId, UserId};
+use serenity::{ApplicationId, ChannelId, UserId};
 use tracing::{info, instrument};
 
 // Types used by all command functions
@@ -14,9 +14,11 @@ pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, Error>;
 
 // Custom user data passed to all command functions
 pub struct Data {
-    pub _votes: Mutex<HashMap<String, u32>>,
+    pub sessions: Mutex<HashMap<ChannelId, bool>>,
     pub owner_id: serenity::UserId,
 }
+
+pub mod commands;
 
 #[instrument(skip(token))]
 pub async fn start(
@@ -36,8 +38,10 @@ pub async fn start(
         ..Default::default()
     };
 
-    options.command(help(), |f| f);
-    options.command(register(), |f| f);
+    options.command(commands::meta::help(), |f| f);
+    options.command(commands::meta::register(), |f| f);
+    options.command(commands::pomo::start(), |f| f);
+    options.command(commands::pomo::stop(), |f| f);
 
     let framework = Framework::new(
         prefix,
@@ -45,7 +49,7 @@ pub async fn start(
         move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(Data {
-                    _votes: Mutex::new(HashMap::new()),
+                    sessions: Mutex::new(HashMap::new()),
                     owner_id: UserId(owner_id.parse()?),
                 })
             })
@@ -57,43 +61,6 @@ pub async fn start(
         .await?;
 
     Ok(())
-}
-
-/// Show this help menu
-#[instrument(skip(ctx))]
-#[poise::command(track_edits, slash_command)]
-pub async fn help(
-    ctx: Context<'_>,
-    #[description = "Specific command to show help about"] command: Option<String>,
-) -> Result<(), Error> {
-    info!("sending help");
-
-    poise::defaults::help(
-        ctx,
-        command.as_deref(),
-        "Pomocop is a tomato timer bot that isn't perpetually scuffed",
-        HelpResponseMode::Ephemeral,
-    )
-    .await?;
-    Ok(())
-}
-
-/// Register slash commands in this guild or globally
-///
-/// Run with no arguments to register in guild, run with argument "global" to
-/// register globally.
-#[instrument(skip(ctx))]
-#[poise::command(check = "is_owner", hide_in_help)]
-pub async fn register(ctx: PrefixContext<'_>, #[flag] global: bool) -> Result<(), Error> {
-    info!("registering slash commands");
-
-    poise::defaults::register_slash_commands(ctx, global).await?;
-
-    Ok(())
-}
-
-pub async fn is_owner(ctx: PrefixContext<'_>) -> Result<bool, Error> {
-    Ok(ctx.msg.author.id == ctx.data.owner_id)
 }
 
 pub async fn on_error(error: Error, ctx: ErrorContext<'_, Data, Error>) {
