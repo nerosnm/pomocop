@@ -38,7 +38,7 @@
 
         src = ./.;
 
-        cargoSha256 = "sha256-QoI3RRCLc348swpHXXkUkcK47AQBB7ZpBiuSX4OfG1k=";
+        cargoSha256 = "sha256-EJhIOYgYxF+aeGI6NQPDM5wiuK+daSxEPk8ivxNYBeA=";
       };
       defaultPackage = packages.pomocop;
 
