@@ -3,7 +3,7 @@ use std::env::var;
 #[tokio::main]
 async fn main() -> Result<(), pomocop::Error> {
     tracing_subscriber::fmt::init();
-    dotenv::dotenv()?;
+    dotenv::dotenv().ok();
     pomocop::start(
         var("APPLICATION_ID")?,
         var("OWNER_ID")?,
