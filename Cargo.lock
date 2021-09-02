@@ -1155,6 +1155,7 @@ dependencies = [
  "libc",
  "memchr",
  "mio",
+ "num_cpus",
  "pin-project-lite",
  "tokio-macros",
  "winapi",
@@ -1203,6 +1204,7 @@ dependencies = [
  "dotenv",
  "poise",
  "tap",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]
