@@ -749,6 +749,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pomocop"
+version = "0.1.0"
+dependencies = [
+ "dotenv",
+ "poise",
+ "tap",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1195,18 +1207,6 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tokio",
-]
-
-[[package]]
-name = "tomat"
-version = "0.1.0"
-dependencies = [
- "dotenv",
- "poise",
- "tap",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

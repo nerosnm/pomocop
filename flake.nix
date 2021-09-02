@@ -1,5 +1,5 @@
 {
-  description = "Tomat Discord bot";
+  description = "Pomocop Discord bot";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
@@ -31,20 +31,20 @@
     in
     rec
     {
-      packages.tomat = pkgs.rustPlatform.buildRustPackage {
-        pname = "tomat";
+      packages.pomocop = pkgs.rustPlatform.buildRustPackage {
+        pname = "pomocop";
         version = "0.1.0";
 
         src = ./.;
 
         cargoSha256 = "sha256-QoI3RRCLc348swpHXXkUkcK47AQBB7ZpBiuSX4OfG1k=";
       };
-      defaultPackage = packages.tomat;
+      defaultPackage = packages.pomocop;
 
-      apps.tomat = flake-utils.lib.mkApp {
-        drv = packages.tomat;
+      apps.pomocop = flake-utils.lib.mkApp {
+        drv = packages.pomocop;
       };
-      defaultApp = apps.tomat;
+      defaultApp = apps.pomocop;
 
       devShell = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
