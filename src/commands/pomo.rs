@@ -71,15 +71,15 @@ pub async fn start(
             );
 
             ctx.channel_id()
-                .say(
-                    &ctx.discord().http,
-                    formatdoc! { "
+                .send_message(&ctx.discord().http, |msg| {
+                    msg.content(formatdoc! { "
                         Finished work session #{session_num}! Starting a {long} minute long break!
                         ",
                         session_num = session + 1,
                         long = long,
-                    },
-                )
+                    })
+                    .tts(true)
+                })
                 .await?;
 
             sleep(Duration::from_secs(long as u64 * 60)).await;
@@ -92,15 +92,15 @@ pub async fn start(
             );
 
             ctx.channel_id()
-                .say(
-                    &ctx.discord().http,
-                    formatdoc! { "
+                .send_message(&ctx.discord().http, |msg| {
+                    msg.content(formatdoc! { "
                         Finished work session #{session_num}! Starting a {short} minute short break!
                         ",
                         session_num = session + 1,
                         short = short,
-                    },
-                )
+                    })
+                    .tts(true)
+                })
                 .await?;
 
             sleep(Duration::from_secs(short as u64 * 60)).await;
@@ -109,24 +109,24 @@ pub async fn start(
         if check_running(&ctx, false)? {
             if session == sessions - 1 {
                 ctx.channel_id()
-                    .say(
-                        &ctx.discord().http,
-                        formatdoc! { "
+                    .send_message(&ctx.discord().http, |msg| {
+                        msg.content(formatdoc! { "
                             You made it through {sessions} work sessions! Nice job!
                             ",
                             sessions = sessions,
-                        },
-                    )
+                        })
+                        .tts(true)
+                    })
                     .await?;
             } else {
                 ctx.channel_id()
-                    .say(
-                        &ctx.discord().http,
-                        formatdoc! { "
+                    .send_message(&ctx.discord().http, |msg| {
+                        msg.content(formatdoc! { "
                             Break over! Back to work! Wee woo wee woo!
                             ",
-                        },
-                    )
+                        })
+                        .tts(true)
+                    })
                     .await?;
             }
         } else {
