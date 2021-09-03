@@ -70,15 +70,17 @@ pub async fn start(
                 "starting long break",
             );
 
-            poise::send_reply(ctx, |reply| {
-                reply.content(formatdoc! { "
-                    Finished work session #{session_num}! Starting a {long} minute long break!
-                    ",
-                    session_num = session + 1,
-                    long = long,
-                })
-            })
-            .await?;
+            ctx.channel_id()
+                .say(
+                    &ctx.discord().http,
+                    formatdoc! { "
+                        Finished work session #{session_num}! Starting a {long} minute long break!
+                        ",
+                        session_num = session + 1,
+                        long = long,
+                    },
+                )
+                .await?;
 
             sleep(Duration::from_secs(long as u64 * 60)).await;
         } else {
@@ -89,37 +91,43 @@ pub async fn start(
                 "starting short break",
             );
 
-            poise::send_reply(ctx, |reply| {
-                reply.content(formatdoc! { "
-                    Finished work session #{session_num}! Starting a {short} minute short break!
-                    ",
-                    session_num = session + 1,
-                    short = short,
-                })
-            })
-            .await?;
+            ctx.channel_id()
+                .say(
+                    &ctx.discord().http,
+                    formatdoc! { "
+                        Finished work session #{session_num}! Starting a {short} minute short break!
+                        ",
+                        session_num = session + 1,
+                        short = short,
+                    },
+                )
+                .await?;
 
             sleep(Duration::from_secs(short as u64 * 60)).await;
         }
 
         if check_running(&ctx, false)? {
             if session == sessions - 1 {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        You made it through {sessions} work sessions! Nice job!
-                        ",
-                        sessions = sessions,
-                    })
-                })
-                .await?;
+                ctx.channel_id()
+                    .say(
+                        &ctx.discord().http,
+                        formatdoc! { "
+                            You made it through {sessions} work sessions! Nice job!
+                            ",
+                            sessions = sessions,
+                        },
+                    )
+                    .await?;
             } else {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        Break over! Back to work! Wee woo wee woo!
-                        ",
-                    })
-                })
-                .await?;
+                ctx.channel_id()
+                    .say(
+                        &ctx.discord().http,
+                        formatdoc! { "
+                            Break over! Back to work! Wee woo wee woo!
+                            ",
+                        },
+                    )
+                    .await?;
             }
         } else {
             break;
