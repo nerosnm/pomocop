@@ -38,7 +38,11 @@
 
         src = ./.;
 
-        cargoSha256 = "sha256-ZlW+dlraXWb/ekQ+7S9W+asR8mV+MG84aWMeXQTQ2ic=";
+        cargoSha256 = "sha256-PdMkVx/5n8GwTyx6wQhxJtsPgaf2wqr3MfiQn3koEFc=";
+
+        buildInputs = with pkgs; [
+          sqlite
+        ];
       };
       defaultPackage = packages.pomocop;
 
@@ -52,6 +56,9 @@
           rustfmt
           rust-toolchain
           nixpkgs-fmt
+        ];
+        buildInputs = with pkgs; [
+          sqlite
         ];
       };
 
