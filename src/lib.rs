@@ -5,7 +5,7 @@ use poise::{
     PrefixFrameworkOptions,
 };
 use serenity::{ApplicationId, ChannelId, UserId};
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 // Types used by all command functions
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -65,10 +65,10 @@ pub async fn start(
 
 pub async fn on_error(error: Error, ctx: ErrorContext<'_, Data, Error>) {
     match ctx {
-        ErrorContext::Setup => panic!("Failed to start bot: {:?}", error),
+        ErrorContext::Setup => panic!("failed to start bot: {:?}", error),
         ErrorContext::Command(ctx) => {
-            println!("Error in command `{}`: {:?}", ctx.command().name(), error)
+            error!(?error, command = %ctx.command().name(), "error in command")
         }
-        _ => println!("Other error: {:?}", error),
+        _ => error!(?error, "other error"),
     }
 }
