@@ -311,6 +311,19 @@ impl SessionConfig {
         }
     }
 
+    pub fn interval(mut self, interval: usize) -> Self {
+        self.interval = interval;
+        self
+    }
+
+    pub fn interval_or_default(self, interval: Option<usize>) -> Self {
+        if let Some(interval) = interval {
+            self.interval(interval)
+        } else {
+            self
+        }
+    }
+
     /// Return the phase type and length for the phase at index `phase_index`.
     fn phase_at(&self, phase_index: usize) -> PhaseType {
         if phase_index % 2 == 0 {
