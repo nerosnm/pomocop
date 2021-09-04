@@ -8,7 +8,7 @@ use serenity::{ApplicationId, ChannelId, UserId};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-use crate::pomo::SessionConfig;
+use crate::pomo::Session;
 
 pub mod commands;
 pub mod pomo;
@@ -20,7 +20,7 @@ pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, Error>;
 
 // Custom user data passed to all command functions
 pub struct Data {
-    pub sessions: Mutex<HashMap<ChannelId, HashMap<Uuid, SessionConfig>>>,
+    pub sessions: Mutex<HashMap<ChannelId, Session>>,
     pub owner_id: serenity::UserId,
 }
 

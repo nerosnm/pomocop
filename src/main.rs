@@ -3,16 +3,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use pomocop::pomo::SessionConfig;
+use pomocop::pomo::{PhaseResult, SessionConfig};
 use tokio::time::{sleep, Duration};
-use tracing::{debug, info, Instrument};
+use tracing::{debug, error, info, Instrument};
 
 #[tokio::main]
 async fn main() -> Result<(), pomocop::Error> {
     tracing_subscriber::fmt::init();
     dotenv::dotenv().ok();
 
-    let config = SessionConfig::default().work(1).short(1).long(1);
+    let config = SessionConfig::default().work(5).short(1).long(2);
 
     debug!(?config);
 
@@ -24,31 +24,42 @@ async fn main() -> Result<(), pomocop::Error> {
 
     let run = tokio::spawn(
         async move {
+            let phase = session_1.lock().unwrap().advance();
+
             info!("starting first phase");
+            let mut result = phase.await;
 
-            let phase = session_1.lock().expect("unable to lock session").advance();
-            let result = phase.await;
+            while let PhaseResult::Completed(_) | PhaseResult::Skipped(_) = result {
+                info!(?result, "finished phase, starting next one");
+                let phase = session_1.lock().unwrap().advance();
+                result = phase.await;
+            }
 
-            info!(?result, "finished first phase");
+            match result {
+                PhaseResult::Stopped(_) => info!(?result, "session stopped"),
+                PhaseResult::Failed(_) => error!(?result, "session failed"),
+                PhaseResult::Completed(_) | PhaseResult::Skipped(_) => unreachable!(),
+            }
         }
         .instrument(tracing::info_span!("run", ?id)),
     );
 
-    let stop = tokio::spawn(
+    let mess_with = tokio::spawn(
         async move {
             sleep(Duration::from_secs(2)).await;
 
+            info!("sending skip message");
+            session_2.lock().unwrap().skip().expect("failed to skip");
+
+            sleep(Duration::from_secs(62)).await;
+
             info!("sending stop message");
-            session_2
-                .lock()
-                .expect("unable to lock session")
-                .stop()
-                .expect("failed to stop");
+            session_2.lock().unwrap().stop().expect("failed to stop");
         }
-        .instrument(tracing::info_span!("stop", ?id)),
+        .instrument(tracing::info_span!("mess_with", ?id)),
     );
 
-    tokio::try_join![run, stop]?;
+    tokio::try_join![run, mess_with]?;
 
     Ok(())
 

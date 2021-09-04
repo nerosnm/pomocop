@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     future::Future,
     pin::Pin,
     sync::{Arc, Mutex},
@@ -7,16 +8,19 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
+use tap::TapFallible;
 use thiserror::Error;
 use tokio::sync::oneshot::{channel as oneshot_channel, error::TryRecvError, Receiver, Sender};
-use tracing::{debug, field, instrument, trace, Span};
+use tracing::{debug, instrument, trace, warn};
 use uuid::Uuid;
 
 /// An active pomocop session.
+#[derive(Debug)]
 pub struct Session {
     id: Uuid,
     config: SessionConfig,
     current_phase: Option<PhaseHandle>,
+    next_index: usize,
 }
 
 impl Session {
@@ -26,6 +30,7 @@ impl Session {
             id: Uuid::new_v4(),
             config,
             current_phase: None,
+            next_index: 0,
         }
     }
 
@@ -34,40 +39,69 @@ impl Session {
         self.id
     }
 
+    /// Unconditionally advance to the next phase and return it, regardless of
+    /// whether there is a running phase already.
+    ///
+    /// In the process, this will drop the stored [`PhaseHandle`], making it
+    /// impossible to skip or stop a running phase. If there is a possibility
+    /// that a phase is still running, [`Session::skip()`] or
+    /// [`Session::stop()`] should be used instead.
+    #[instrument]
     pub fn advance(&mut self) -> Phase {
         let (send, recv) = oneshot_channel();
 
-        let start = Utc::now();
-        let end = start + Duration::minutes(self.config.work as i64);
+        let phase_type = self.config.phase_at(self.next_index);
+        self.next_index += 1;
 
-        self.current_phase = Some(PhaseHandle { start, send });
+        let start = Utc::now();
+        let end = start + Duration::seconds(phase_type.length() as i64);
+
+        self.current_phase = Some(PhaseHandle {
+            started: start,
+            phase_type,
+            send,
+        });
 
         Phase {
             session: self.id,
             end,
+            phase_type,
             recv,
             waker: None,
         }
     }
 
-    pub fn skip(&mut self) -> Result<Phase, SessionError> {
+    /// Skip the currently running phase.
+    ///
+    /// Returns [`SessionError::NotActive`] if there is no currently running
+    /// phase, or if it was not possible to send the skip message (which likely
+    /// means that the phase finished on its own).
+    #[instrument]
+    pub fn skip(&mut self) -> Result<(), SessionError> {
         if let Some(phase) = self.current_phase.take() {
             phase
                 .send
                 .send(PhaseMessage::Skip)
-                .map_err(|_| SessionError::Skip)
-                .map(|_| self.advance())
+                .tap_err(|_| warn!("unable to skip phase; did it complete on its own?"))
+                .or(Ok(()))
         } else {
             Err(SessionError::NotActive)
         }
     }
 
+    /// Stop the session by stopping the currently running phase.
+    ///
+    /// Returns [`SessionError::NotActive`] if there is no currently running
+    /// phase, or if it was not possible to send the stop message (which likely
+    /// means that the phase finished on its own).
+    #[instrument]
     pub fn stop(&mut self) -> Result<(), SessionError> {
         if let Some(phase) = self.current_phase.take() {
             phase
                 .send
                 .send(PhaseMessage::Stop)
-                .map_err(|_| SessionError::Stop)
+                .tap_err(|_| warn!("unable to stop phase; did it complete on its own?"))
+                .map_err(|_| SessionError::NotActive)
         } else {
             Err(SessionError::NotActive)
         }
@@ -76,38 +110,49 @@ impl Session {
 
 #[derive(Debug, Error)]
 pub enum SessionError {
-    #[error("failed to skip phase")]
-    Skip,
-
-    #[error("failed to stop session")]
-    Stop,
-
-    #[error("session is not active")]
+    #[error("there is no currently active phase")]
     NotActive,
 }
 
+/// Messages that can be sent to running [`Phase`]s to instruct them to do
+/// things.
 enum PhaseMessage {
-    Stop,
+    /// Stop the phase and resolve to a [`PhaseResult::Skipped`].
     Skip,
+    /// Stop the phase and resolve to a [`PhaseResult::Stopped`].
+    Stop,
 }
 
+/// A handle allowing communication with, and holding details about, a running
+/// [`Phase`].
 pub struct PhaseHandle {
-    start: DateTime<Utc>,
+    started: DateTime<Utc>,
+    phase_type: PhaseType,
     send: Sender<PhaseMessage>,
+}
+
+impl fmt::Debug for PhaseHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Phase")
+            .field("started", &self.started)
+            .field("send", &"Sender<PhaseMessage>")
+            .finish()
+    }
 }
 
 #[derive(Debug)]
 pub enum PhaseResult {
-    Completed,
-    Skipped,
-    Stopped,
-    Failed,
+    Completed(PhaseType),
+    Skipped(PhaseType),
+    Stopped(PhaseType),
+    Failed(PhaseType),
 }
 
 #[must_use]
 pub struct Phase {
     session: Uuid,
     end: DateTime<Utc>,
+    phase_type: PhaseType,
     recv: Receiver<PhaseMessage>,
     waker: Option<(Arc<Mutex<Waker>>, Receiver<()>)>,
 }
@@ -115,11 +160,8 @@ pub struct Phase {
 impl Future for Phase {
     type Output = PhaseResult;
 
-    #[instrument(skip(self, ctx), fields(session = field::Empty))]
+    #[instrument(skip(self, ctx))]
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let span = Span::current();
-        span.record("session", &format!("{:?}", self.session).as_str());
-
         // For more info on this waker logic: https://tokio.rs/tokio/tutorial/async
 
         if let Some((waker, waker_recv)) = self.waker.as_mut() {
@@ -141,7 +183,7 @@ impl Future for Phase {
         }
 
         // This will be None either if we haven't spawned a waker thread yet, or if
-        // we've just found out that the previous one is
+        // we've just found out that the previous one is finished.
         if self.waker.is_none() {
             let when = Utc::now() + Duration::milliseconds(100);
 
@@ -149,7 +191,12 @@ impl Future for Phase {
             let waker = Arc::new(Mutex::new(ctx.waker().clone()));
             self.waker = Some((waker.clone(), recv));
 
+            let session = self.session;
+
             thread::spawn(move || {
+                let span = tracing::debug_span!("waker", id = ?session);
+                let _enter = span.enter();
+
                 let now = Utc::now();
 
                 if now < when {
@@ -160,8 +207,17 @@ impl Future for Phase {
                     thread::sleep(duration);
                 }
 
-                send.send(())
-                    .expect("receiver should not have been dropped yet");
+                match send.send(()) {
+                    Ok(()) => {
+                        trace!("signalled phase that waker thread has completed");
+                    }
+                    Err(()) => {
+                        debug!(
+                            "unable to signal phase that waker thread has completed; phase was \
+                             probably dropped"
+                        );
+                    }
+                }
 
                 let waker = waker.lock().unwrap();
                 waker.wake_by_ref();
@@ -171,15 +227,15 @@ impl Future for Phase {
         match self.recv.try_recv() {
             Ok(PhaseMessage::Skip) => {
                 debug!("phase skipped");
-                Poll::Ready(PhaseResult::Skipped)
+                Poll::Ready(PhaseResult::Skipped(self.phase_type))
             }
             Ok(PhaseMessage::Stop) => {
                 debug!("phase stopped");
-                Poll::Ready(PhaseResult::Stopped)
+                Poll::Ready(PhaseResult::Stopped(self.phase_type))
             }
             Err(TryRecvError::Closed) => {
                 debug!("phase failed");
-                Poll::Ready(PhaseResult::Failed)
+                Poll::Ready(PhaseResult::Failed(self.phase_type))
             }
             Err(TryRecvError::Empty) => {
                 let now = Utc::now();
@@ -187,7 +243,7 @@ impl Future for Phase {
 
                 if is_finished {
                     debug!("phase completed");
-                    Poll::Ready(PhaseResult::Completed)
+                    Poll::Ready(PhaseResult::Completed(self.phase_type))
                 } else {
                     trace!("phase still pending");
                     Poll::Pending
@@ -197,13 +253,17 @@ impl Future for Phase {
     }
 }
 
-/// A pomocop session configuration, defining the lengths of each of the three
-/// types of phase, and the interval between long breaks.
+/// A pomocop session configuration, defining the lengths (in minutes) of each
+/// of the three types of phase, and the interval between long breaks.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SessionConfig {
+    /// The number of minutes each work phase should last for.
     work: usize,
+    /// The number of minutes each short break should last for.
     short: usize,
+    /// The number of minutes each long break should last for.
     long: usize,
+    /// The number of work sessions in between each long break.
     interval: usize,
 }
 
@@ -250,6 +310,21 @@ impl SessionConfig {
             self
         }
     }
+
+    /// Return the phase type and length for the phase at index `phase_index`.
+    fn phase_at(&self, phase_index: usize) -> PhaseType {
+        if phase_index % 2 == 0 {
+            // The phase index is even, so it's a work phase
+            PhaseType::Work(self.work)
+        } else if phase_index % (self.interval * 2) == (self.interval * 2 - 1) {
+            // The interval refers to how many *work* sessions pass between each long break,
+            // so we need to multiply it by 2 to get how many *actual* sessions
+            // pass between each long break.
+            PhaseType::Long(self.long)
+        } else {
+            PhaseType::Short(self.short)
+        }
+    }
 }
 
 impl Default for SessionConfig {
@@ -260,5 +335,52 @@ impl Default for SessionConfig {
             long: 15,
             interval: 4,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhaseType {
+    Work(usize),
+    Short(usize),
+    Long(usize),
+}
+
+impl PhaseType {
+    pub fn length(&self) -> usize {
+        use PhaseType::*;
+        match *self {
+            Work(length) | Short(length) | Long(length) => length,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn length_calc() {
+        let config = SessionConfig::default();
+
+        let actual = (0..8)
+            .into_iter()
+            .map(|i| config.phase_at(i))
+            .collect::<Vec<_>>();
+
+        let expected = vec![
+            PhaseType::Work(config.work),
+            PhaseType::Short(config.short),
+            PhaseType::Work(config.work),
+            PhaseType::Short(config.short),
+            PhaseType::Work(config.work),
+            PhaseType::Short(config.short),
+            PhaseType::Work(config.work),
+            PhaseType::Long(config.long),
+        ];
+
+        assert_eq!(
+            actual, expected,
+            "lengths of each session were not calculated correctly"
+        );
     }
 }
