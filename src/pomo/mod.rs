@@ -58,7 +58,6 @@ impl Session {
 
         self.current_phase = Some(PhaseHandle {
             started: start,
-            phase_type,
             send,
         });
 
@@ -127,7 +126,6 @@ enum PhaseMessage {
 /// [`Phase`].
 pub struct PhaseHandle {
     started: DateTime<Utc>,
-    phase_type: PhaseType,
     send: Sender<PhaseMessage>,
 }
 
@@ -155,6 +153,12 @@ pub struct Phase {
     phase_type: PhaseType,
     recv: Receiver<PhaseMessage>,
     waker: Option<(Arc<Mutex<Waker>>, Receiver<()>)>,
+}
+
+impl Phase {
+    pub fn phase_type(&self) -> &PhaseType {
+        &self.phase_type
+    }
 }
 
 impl Future for Phase {
@@ -258,13 +262,13 @@ impl Future for Phase {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SessionConfig {
     /// The number of minutes each work phase should last for.
-    work: usize,
+    pub work: usize,
     /// The number of minutes each short break should last for.
-    short: usize,
+    pub short: usize,
     /// The number of minutes each long break should last for.
-    long: usize,
+    pub long: usize,
     /// The number of work sessions in between each long break.
-    interval: usize,
+    pub interval: usize,
 }
 
 impl SessionConfig {
@@ -363,6 +367,14 @@ impl PhaseType {
         use PhaseType::*;
         match *self {
             Work(length) | Short(length) | Long(length) => length,
+        }
+    }
+
+    pub fn description(&self) -> String {
+        match *self {
+            PhaseType::Work(length) => format!("{} minute work session", length),
+            PhaseType::Short(length) => format!("{} minute short break", length),
+            PhaseType::Long(length) => format!("{} minute long break", length),
         }
     }
 }

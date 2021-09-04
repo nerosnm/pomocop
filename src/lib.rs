@@ -6,7 +6,6 @@ use poise::{
 };
 use serenity::{ApplicationId, ChannelId, UserId};
 use tracing::{error, info, instrument};
-use uuid::Uuid;
 
 use crate::pomo::Session;
 
@@ -25,7 +24,7 @@ pub struct Data {
 }
 
 #[instrument(skip(token))]
-pub async fn start(
+pub async fn run(
     application_id: String,
     owner_id: String,
     prefix: String,
@@ -44,7 +43,7 @@ pub async fn start(
 
     options.command(commands::meta::help(), |f| f);
     options.command(commands::meta::register(), |f| f);
-    // options.command(commands::pomo::start(), |f| f);
+    options.command(commands::pomo::start(), |f| f);
     // options.command(commands::pomo::stop(), |f| f);
 
     let framework = Framework::new(
