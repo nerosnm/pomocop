@@ -8,7 +8,7 @@ use serenity::{ApplicationId, ChannelId, UserId};
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
 
-use crate::pomo::Session;
+use crate::pomo::session::Session;
 
 pub mod commands;
 pub mod pomo;

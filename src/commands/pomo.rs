@@ -2,7 +2,7 @@ use indoc::formatdoc;
 use tracing::{error, info, instrument};
 
 use crate::{
-    pomo::{PhaseResult, Session, SessionConfig, SessionError},
+    pomo::session::{PhaseResult, Session, SessionConfig, SessionError},
     Context, Error,
 };
 
