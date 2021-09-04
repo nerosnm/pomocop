@@ -6,6 +6,12 @@ use poise::{
 };
 use serenity::{ApplicationId, ChannelId, UserId};
 use tracing::{error, info, instrument};
+use uuid::Uuid;
+
+use crate::pomo::SessionConfig;
+
+pub mod commands;
+pub mod pomo;
 
 // Types used by all command functions
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -14,11 +20,9 @@ pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, Error>;
 
 // Custom user data passed to all command functions
 pub struct Data {
-    pub sessions: Mutex<HashMap<ChannelId, bool>>,
+    pub sessions: Mutex<HashMap<ChannelId, HashMap<Uuid, SessionConfig>>>,
     pub owner_id: serenity::UserId,
 }
-
-pub mod commands;
 
 #[instrument(skip(token))]
 pub async fn start(
@@ -40,8 +44,8 @@ pub async fn start(
 
     options.command(commands::meta::help(), |f| f);
     options.command(commands::meta::register(), |f| f);
-    options.command(commands::pomo::start(), |f| f);
-    options.command(commands::pomo::stop(), |f| f);
+    // options.command(commands::pomo::start(), |f| f);
+    // options.command(commands::pomo::stop(), |f| f);
 
     let framework = Framework::new(
         prefix,
