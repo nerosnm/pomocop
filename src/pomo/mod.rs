@@ -54,7 +54,7 @@ impl Session {
         self.next_index += 1;
 
         let start = Utc::now();
-        let end = start + Duration::seconds(phase_type.length() as i64);
+        let end = start + Duration::minutes(phase_type.length() as i64);
 
         self.current_phase = Some(PhaseHandle {
             started: start,
