@@ -39,6 +39,11 @@ impl Session {
         self.id
     }
 
+    /// Get the config of this session.
+    pub fn config(&self) -> &SessionConfig {
+        &self.config
+    }
+
     /// Unconditionally advance to the next phase and return it, regardless of
     /// whether there is a running phase already.
     ///
@@ -375,6 +380,15 @@ impl PhaseType {
             PhaseType::Work(length) => format!("{} minute work session", length),
             PhaseType::Short(length) => format!("{} minute short break", length),
             PhaseType::Long(length) => format!("{} minute long break", length),
+        }
+    }
+
+    pub fn sentiment(&self) -> String {
+        match *self {
+            PhaseType::Work(_) => format!("Nice job!"),
+            PhaseType::Short(_) | PhaseType::Long(_) => {
+                format!("Back to work! Wee woo wee woo weewooweeweoowoewe!")
+            }
         }
     }
 }

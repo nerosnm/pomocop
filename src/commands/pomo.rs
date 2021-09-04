@@ -1,8 +1,14 @@
-use indoc::formatdoc;
 use tracing::{error, info, instrument};
 
 use crate::{
-    pomo::session::{PhaseResult, Session, SessionConfig, SessionError},
+    pomo::{
+        reply::{
+            reply_cannot_start, reply_skip_failed, reply_skip_no_session, reply_skipping_phase,
+            reply_starting, reply_stop_failed, reply_stop_no_session, reply_stopping_session,
+            say_phase_finished, say_session_failed, say_session_stopped,
+        },
+        session::{PhaseResult, Session, SessionConfig, SessionError},
+    },
     Context, Error,
 };
 
@@ -25,15 +31,7 @@ pub async fn start(
         .await
         .contains_key(&ctx.channel_id())
     {
-        poise::send_reply(ctx, |reply| {
-            reply.content(formatdoc! { "
-                Unable to start pomocop session.
-
-                There is already a running session in this channel!
-                "
-            })
-        })
-        .await?;
+        reply_cannot_start(ctx).await;
 
         Ok(())
     } else {
@@ -43,22 +41,10 @@ pub async fn start(
             .long_or_default(long)
             .interval_or_default(interval);
 
-        poise::send_reply(ctx, |reply| {
-            reply.content(formatdoc! { "
-                Starting pomocop session.
-
-                Working for {work} minutes at a time, with a {short} minute short break after each work session, and a {long} minute long break after every {interval}.
-                ",
-                work = config.work,
-                short = config.short,
-                long = config.long,
-                interval = config.interval,
-            })
-        })
-        .await?;
-
         let session = config.build();
         info!(?session, "created new session");
+
+        reply_starting(ctx, session.config(), session.id()).await;
 
         run_session(ctx, session).await
     }
@@ -93,21 +79,7 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
 
         info!(phase_type = ?phase.phase_type(), "starting next phase");
 
-        if let Err(error) = ctx
-            .channel_id()
-            .send_message(&ctx.discord().http, |msg| {
-                msg.content(formatdoc! { "
-                    Finished a {finished}, starting a {next}!
-                    ",
-                    finished = finished.description(),
-                    next = phase.phase_type().description(),
-                })
-                .tts(true)
-            })
-            .await
-        {
-            error!(?error, "unable to send phase change message");
-        }
+        say_phase_finished(ctx, finished, *phase.phase_type()).await;
 
         result = phase.await;
     }
@@ -116,37 +88,12 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
         PhaseResult::Stopped(_) => {
             info!(?result, "session stopped");
 
-            if let Err(error) = ctx
-                .channel_id()
-                .send_message(&ctx.discord().http, |msg| {
-                    msg.content(formatdoc! { "
-                        Session stopped!
-                        ",
-                    })
-                    .tts(true)
-                })
-                .await
-            {
-                error!(?error, "unable to send session stopped message");
-            }
+            say_session_stopped(ctx).await;
         }
         PhaseResult::Failed(_) => {
             error!(?result, "session failed");
 
-            if let Err(error) = ctx
-                .channel_id()
-                .send_message(&ctx.discord().http, |msg| {
-                    msg.content(formatdoc! { "
-                        Session {id} failed!
-                        ",
-                        id = id,
-                    })
-                    .tts(true)
-                })
-                .await
-            {
-                error!(?error, "unable to send session failed message");
-            }
+            say_session_failed(ctx, id).await;
         }
         PhaseResult::Completed(_) | PhaseResult::Skipped(_) => unreachable!(),
     }
@@ -163,37 +110,11 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
         match session.skip() {
-            Ok(()) => {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        Skipping phase...
-                        "
-                    })
-                })
-                .await?;
-            }
-            Err(SessionError::NotActive) => {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        Unable to skip current phase.
-
-                        It may have completed on its own. Please check if the phase already advanced, and if not, try again.
-                        "
-                    })
-                })
-                .await?;
-            }
+            Ok(()) => reply_skipping_phase(ctx).await,
+            Err(SessionError::NotActive) => reply_skip_failed(ctx, session.id()).await,
         }
     } else {
-        poise::send_reply(ctx, |reply| {
-            reply.content(formatdoc! { "
-                Unable to skip current phase.
-
-                There is no running session in this channel!
-                "
-            })
-        })
-        .await?;
+        reply_skip_no_session(ctx).await;
     }
 
     Ok(())
@@ -205,37 +126,11 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
         match session.stop() {
-            Ok(()) => {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        Stopping session...
-                        "
-                    })
-                })
-                .await?;
-            }
-            Err(SessionError::NotActive) => {
-                poise::send_reply(ctx, |reply| {
-                    reply.content(formatdoc! { "
-                        Unable to stop session.
-
-                        Please try again.
-                        "
-                    })
-                })
-                .await?;
-            }
+            Ok(()) => reply_stopping_session(ctx).await,
+            Err(SessionError::NotActive) => reply_stop_failed(ctx, session.id()).await,
         }
     } else {
-        poise::send_reply(ctx, |reply| {
-            reply.content(formatdoc! { "
-                Unable to stop session.
-
-                There is no running session in this channel!
-                "
-            })
-        })
-        .await?;
+        reply_stop_no_session(ctx).await;
     }
 
     Ok(())
