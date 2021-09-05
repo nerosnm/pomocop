@@ -185,24 +185,26 @@ pub async fn reply_status(
     tz: Tz,
 ) {
     send_reply(ctx, |avatar_url, reply| {
-        reply.embed(green_embed(avatar_url, |embed| {
-            embed
-                .title("Status")
-                .field("Phase", phase_type.description(), false)
-                .field("Elapsed", phase_elapsed.hhmmss(), true)
-                .field("Remaining", phase_remaining.hhmmss(), true)
-                .field("Next", next_type.description(), true)
-                .field(
-                    "Next Long Break",
-                    format!(
-                        "{} ({}), {} from now",
-                        long_at.with_timezone(&tz).format("%H:%M:%S"),
-                        tz,
-                        (long_at - Utc::now()).hhmmss()
-                    ),
-                    false,
-                )
-        }))
+        reply
+            .ephemeral(true)
+            .embed(green_embed(avatar_url, |embed| {
+                embed
+                    .title("Status")
+                    .field("Phase", phase_type.description(), false)
+                    .field("Elapsed", phase_elapsed.hhmmss(), true)
+                    .field("Remaining", phase_remaining.hhmmss(), true)
+                    .field("Next", next_type.description(), true)
+                    .field(
+                        "Next Long Break",
+                        format!(
+                            "{} ({}), {} from now",
+                            long_at.with_timezone(&tz).format("%H:%M:%S"),
+                            tz,
+                            (long_at - Utc::now()).hhmmss()
+                        ),
+                        false,
+                    )
+            }))
     })
     .await;
 }
