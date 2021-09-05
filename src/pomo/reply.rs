@@ -212,7 +212,7 @@ pub async fn reply_status(
 #[instrument(skip(ctx))]
 pub async fn reply_status_no_session(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
-        reply.embed(red_embed(avatar_url, |embed| {
+        reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
             embed.title("No Session").description(
                 "Cannot get status because there is no running session in this channel.",
             )
