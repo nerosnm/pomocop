@@ -118,6 +118,10 @@ impl Session {
                 phase_type: phase.phase_type,
                 phase_elapsed: phase.elapsed(),
                 phase_remaining: phase.remaining(),
+                next_type: self.config.phase_at(self.next_index),
+                long_at: Utc::now()
+                    + phase.remaining()
+                    + Duration::minutes(self.config.until_long(self.next_index) as i64),
             },
             None => SessionStatus::NoSession,
         }
@@ -131,6 +135,8 @@ pub enum SessionStatus {
         phase_type: PhaseType,
         phase_elapsed: Duration,
         phase_remaining: Duration,
+        next_type: PhaseType,
+        long_at: DateTime<Utc>,
     },
 }
 
@@ -379,6 +385,19 @@ impl SessionConfig {
         } else {
             PhaseType::Short(self.short)
         }
+    }
+
+    /// Return the number of minutes between the beginning of the phase with
+    /// index `current` and the beginning of the next long break.
+    fn until_long(&self, mut current: usize) -> usize {
+        let mut minutes = 0;
+
+        while let PhaseType::Work(length) | PhaseType::Short(length) = self.phase_at(current) {
+            minutes += length;
+            current += 1;
+        }
+
+        minutes
     }
 }
 

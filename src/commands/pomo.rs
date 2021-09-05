@@ -115,7 +115,19 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
                 phase_type,
                 phase_elapsed,
                 phase_remaining,
-            } => reply_status(ctx, phase_type, phase_elapsed, phase_remaining).await,
+                next_type,
+                long_at,
+            } => {
+                reply_status(
+                    ctx,
+                    phase_type,
+                    phase_elapsed,
+                    phase_remaining,
+                    next_type,
+                    long_at,
+                )
+                .await
+            }
             SessionStatus::NoSession => reply_status_no_session(ctx).await,
         }
     } else {
