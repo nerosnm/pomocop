@@ -45,6 +45,7 @@ pub async fn run(
     options.command(commands::meta::help(), |f| f);
     options.command(commands::meta::register(), |f| f);
     options.command(commands::pomo::start(), |f| f);
+    options.command(commands::pomo::status(), |f| f);
     options.command(commands::pomo::skip(), |f| f);
     options.command(commands::pomo::stop(), |f| f);
 

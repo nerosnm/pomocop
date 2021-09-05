@@ -1,3 +1,5 @@
+use chrono::Duration;
+use hhmmss::Hhmmss;
 use indoc::formatdoc;
 use poise::{serenity_prelude as serenity, CreateReply};
 use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder};
@@ -167,6 +169,37 @@ pub async fn say_phase_finished(ctx: Context<'_>, finished: PhaseType, next: Pha
                     ))
                     .field("Starting Now", next.description(), false)
             }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_status(
+    ctx: Context<'_>,
+    phase_type: PhaseType,
+    phase_elapsed: Duration,
+    phase_remaining: Duration,
+) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.embed(green_embed(avatar_url, |embed| {
+            embed
+                .title("Status")
+                .field("Phase", phase_type.description(), false)
+                .field("Elapsed", phase_elapsed.hhmmss(), true)
+                .field("Remaining", phase_remaining.hhmmss(), true)
+        }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_status_no_session(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.embed(red_embed(avatar_url, |embed| {
+            embed.title("No Session").description(
+                "Cannot get status because there is no running session in this channel.",
+            )
+        }))
     })
     .await;
 }

@@ -4,10 +4,11 @@ use crate::{
     pomo::{
         reply::{
             reply_cannot_start, reply_skip_failed, reply_skip_no_session, reply_skipping_phase,
-            reply_starting, reply_stop_failed, reply_stop_no_session, reply_stopping_session,
-            say_phase_finished, say_session_failed, say_session_stopped,
+            reply_starting, reply_status, reply_status_no_session, reply_stop_failed,
+            reply_stop_no_session, reply_stopping_session, say_phase_finished, say_session_failed,
+            say_session_stopped,
         },
-        session::{PhaseResult, Session, SessionConfig, SessionError},
+        session::{PhaseResult, Session, SessionConfig, SessionError, SessionStatus},
     },
     Context, Error,
 };
@@ -100,6 +101,26 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
 
     let mut sessions = ctx.data().sessions.lock().await;
     sessions.remove(&ctx.channel_id());
+
+    Ok(())
+}
+
+/// Get the status of the current pomo session running in this channel
+#[instrument(skip(ctx))]
+#[poise::command(slash_command)]
+pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
+    if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
+        match session.status() {
+            SessionStatus::Running {
+                phase_type,
+                phase_elapsed,
+                phase_remaining,
+            } => reply_status(ctx, phase_type, phase_elapsed, phase_remaining).await,
+            SessionStatus::NoSession => reply_status_no_session(ctx).await,
+        }
+    } else {
+        reply_status_no_session(ctx).await;
+    }
 
     Ok(())
 }

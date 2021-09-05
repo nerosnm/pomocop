@@ -63,6 +63,7 @@ impl Session {
 
         self.current_phase = Some(PhaseHandle {
             started: start,
+            phase_type,
             send,
         });
 
@@ -110,6 +111,27 @@ impl Session {
             Err(SessionError::NotActive)
         }
     }
+
+    pub fn status(&self) -> SessionStatus {
+        match self.current_phase {
+            Some(ref phase) => SessionStatus::Running {
+                phase_type: phase.phase_type,
+                phase_elapsed: phase.elapsed(),
+                phase_remaining: phase.remaining(),
+            },
+            None => SessionStatus::NoSession,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SessionStatus {
+    NoSession,
+    Running {
+        phase_type: PhaseType,
+        phase_elapsed: Duration,
+        phase_remaining: Duration,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -131,7 +153,18 @@ enum PhaseMessage {
 /// [`Phase`].
 pub struct PhaseHandle {
     started: DateTime<Utc>,
+    phase_type: PhaseType,
     send: Sender<PhaseMessage>,
+}
+
+impl PhaseHandle {
+    fn elapsed(&self) -> Duration {
+        Utc::now() - self.started
+    }
+
+    fn remaining(&self) -> Duration {
+        Duration::minutes(self.phase_type.length() as i64) - self.elapsed()
+    }
 }
 
 impl fmt::Debug for PhaseHandle {
