@@ -1,6 +1,6 @@
 use indoc::formatdoc;
 use poise::{serenity_prelude as serenity, CreateReply};
-use serenity::{Color, CreateEmbed, CreateMessage};
+use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder};
 use tracing::{error, instrument};
 use uuid::Uuid;
 
@@ -155,16 +155,18 @@ pub async fn reply_cannot_start(ctx: Context<'_>) {
 #[instrument(skip(ctx))]
 pub async fn say_phase_finished(ctx: Context<'_>, finished: PhaseType, next: PhaseType) {
     send_message(ctx, |avatar_url, message| {
-        message.embed(green_embed(avatar_url, |embed| {
-            embed
-                .title("Finished Phase")
-                .description(format!(
-                    "Finished a {}. {}",
-                    finished.description(),
-                    finished.sentiment()
-                ))
-                .field("Starting Now", next.description(), false)
-        }))
+        message
+            .content(MessageBuilder::new().mention(ctx.author()).build())
+            .embed(green_embed(avatar_url, |embed| {
+                embed
+                    .title("Finished Phase")
+                    .description(format!(
+                        "Finished a {}. {}",
+                        finished.description(),
+                        finished.sentiment()
+                    ))
+                    .field("Starting Now", next.description(), false)
+            }))
     })
     .await;
 }
