@@ -9,6 +9,9 @@ use crate::{
     Context,
 };
 
+const GREEN: Color = Color::from_rgb(29, 131, 41);
+const RED: Color = Color::from_rgb(205, 46, 2);
+
 fn no_footer<B>(builder: B) -> impl FnOnce(&mut CreateEmbed) -> &mut CreateEmbed
 where
     B: FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
@@ -23,7 +26,7 @@ fn green_embed<B>(
 where
     B: FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
 {
-    embed_with_defaults(avatar_url, Color::from_rgb(29, 131, 41), builder)
+    embed_with_defaults(avatar_url, GREEN, builder)
 }
 
 fn red_embed<B>(
@@ -33,7 +36,7 @@ fn red_embed<B>(
 where
     B: FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
 {
-    embed_with_defaults(avatar_url, Color::from_rgb(205, 46, 2), builder)
+    embed_with_defaults(avatar_url, RED, builder)
 }
 
 fn embed_with_defaults<B>(
