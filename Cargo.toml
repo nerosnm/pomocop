@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.19"
+chrono-tz = "0.5.3"
 dotenv = "0.15.0"
 hhmmss = "0.1.0"
 indoc = "1.0.3"

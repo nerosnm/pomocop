@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, Utc};
+use chrono_tz::Tz;
 use hhmmss::Hhmmss;
 use indoc::formatdoc;
 use poise::{serenity_prelude as serenity, CreateReply};
@@ -181,6 +182,7 @@ pub async fn reply_status(
     phase_remaining: Duration,
     next_type: PhaseType,
     long_at: DateTime<Utc>,
+    tz: Tz,
 ) {
     send_reply(ctx, |avatar_url, reply| {
         reply.embed(green_embed(avatar_url, |embed| {
@@ -193,8 +195,9 @@ pub async fn reply_status(
                 .field(
                     "Next Long Break",
                     format!(
-                        "{} ({} from now)",
-                        long_at.format("%H:%M:%S UTC"),
+                        "{} ({}), {} from now",
+                        long_at.with_timezone(&tz).format("%H:%M:%S"),
+                        tz,
                         (long_at - Utc::now()).hhmmss()
                     ),
                     false,

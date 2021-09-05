@@ -1,3 +1,4 @@
+use chrono_tz::{Tz, UTC};
 use tracing::{error, info, instrument};
 
 use crate::{
@@ -108,7 +109,16 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
 /// Get the status of the current pomo session running in this channel
 #[instrument(skip(ctx))]
 #[poise::command(slash_command)]
-pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn status(
+    ctx: Context<'_>,
+    #[description = "Your time zone (example: Europe/London, default: UTC)"] timezone: Option<
+        String,
+    >,
+) -> Result<(), Error> {
+    let tz: Tz = timezone
+        .and_then(|tz_str| tz_str.parse().ok())
+        .unwrap_or(UTC);
+
     if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
         match session.status() {
             SessionStatus::Running {
@@ -125,6 +135,7 @@ pub async fn status(ctx: Context<'_>) -> Result<(), Error> {
                     phase_remaining,
                     next_type,
                     long_at,
+                    tz,
                 )
                 .await
             }
