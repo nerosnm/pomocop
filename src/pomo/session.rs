@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fmt,
     future::Future,
     pin::Pin,
@@ -8,6 +9,8 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
+use poise::serenity_prelude as serenity;
+use serenity::UserId;
 use tap::TapFallible;
 use thiserror::Error;
 use tokio::sync::oneshot::{channel as oneshot_channel, error::TryRecvError, Receiver, Sender};
@@ -18,6 +21,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct Session {
     id: Uuid,
+    members: HashSet<UserId>,
     config: SessionConfig,
     current_phase: Option<PhaseHandle>,
     next_index: usize,
@@ -28,6 +32,7 @@ impl Session {
     fn from_config(config: SessionConfig) -> Self {
         Self {
             id: Uuid::new_v4(),
+            members: HashSet::new(),
             config,
             current_phase: None,
             next_index: 0,
@@ -42,6 +47,26 @@ impl Session {
     /// Get the config of this session.
     pub fn config(&self) -> &SessionConfig {
         &self.config
+    }
+
+    /// Add a user to the set of members of this session.
+    ///
+    /// Returns whether the user was added (i.e. `true` if the user was not
+    /// already a member, `false` otherwise).
+    pub fn add_member(&mut self, user: UserId) -> bool {
+        self.members.insert(user)
+    }
+
+    /// Remove a user from the set of members of this session.
+    ///
+    /// Returns whether the user was a member.
+    pub fn remove_member(&mut self, user: UserId) -> bool {
+        self.members.remove(&user)
+    }
+
+    /// Get the set of members of this session
+    pub fn members(&self) -> &HashSet<UserId> {
+        &self.members
     }
 
     /// Unconditionally advance to the next phase and return it, regardless of

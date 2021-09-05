@@ -4,10 +4,11 @@ use tracing::{error, info, instrument};
 use crate::{
     pomo::{
         reply::{
-            reply_cannot_start, reply_skip_failed, reply_skip_no_session, reply_skipping_phase,
-            reply_starting, reply_status, reply_status_no_session, reply_stop_failed,
-            reply_stop_no_session, reply_stopping_session, say_phase_finished, say_session_failed,
-            say_session_stopped,
+            reply_cannot_start, reply_join_already_member, reply_join_no_session, reply_joined,
+            reply_leave_no_session, reply_leave_not_member, reply_left, reply_skip_failed,
+            reply_skip_no_session, reply_skipping_phase, reply_starting, reply_status,
+            reply_status_no_session, reply_stop_failed, reply_stop_no_session,
+            reply_stopping_session, say_phase_finished, say_session_failed, say_session_stopped,
         },
         session::{PhaseResult, Session, SessionConfig, SessionError, SessionStatus},
     },
@@ -43,7 +44,9 @@ pub async fn start(
             .long_or_default(long)
             .interval_or_default(interval);
 
-        let session = config.build();
+        let mut session = config.build();
+        session.add_member(ctx.author().id);
+
         info!(?session, "created new session");
 
         reply_starting(ctx, session.config(), session.id()).await;
@@ -73,15 +76,18 @@ async fn run_session(ctx: Context<'_>, session: Session) -> Result<(), Error> {
         info!(?result, "finished phase");
 
         let mut sessions = ctx.data().sessions.lock().await;
-        let phase = sessions
+        let session = sessions
             .get_mut(&ctx.channel_id())
-            .expect("session stays in sessions until we remove it")
-            .advance();
-        drop(sessions);
+            .expect("session stays in sessions until we remove it");
+
+        let phase = session.advance();
+        let members = session.members().iter();
 
         info!(phase_type = ?phase.phase_type(), "starting next phase");
 
-        say_phase_finished(ctx, finished, *phase.phase_type()).await;
+        say_phase_finished(ctx, finished, *phase.phase_type(), members).await;
+
+        drop(sessions);
 
         result = phase.await;
     }
@@ -143,6 +149,41 @@ pub async fn status(
         }
     } else {
         reply_status_no_session(ctx).await;
+    }
+
+    Ok(())
+}
+
+/// Join the pomo session running in this channel to be notified when phases
+/// finish
+#[instrument(skip(ctx))]
+#[poise::command(slash_command)]
+pub async fn join(ctx: Context<'_>) -> Result<(), Error> {
+    if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
+        if session.add_member(ctx.author().id) {
+            reply_joined(ctx).await;
+        } else {
+            reply_join_already_member(ctx).await;
+        }
+    } else {
+        reply_join_no_session(ctx).await;
+    }
+
+    Ok(())
+}
+
+/// Leave the pomo session running in this channel to stop being notified
+#[instrument(skip(ctx))]
+#[poise::command(slash_command)]
+pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
+    if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
+        if session.remove_member(ctx.author().id) {
+            reply_left(ctx).await;
+        } else {
+            reply_leave_not_member(ctx).await;
+        }
+    } else {
+        reply_leave_no_session(ctx).await;
     }
 
     Ok(())

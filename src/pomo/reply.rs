@@ -3,7 +3,7 @@ use chrono_tz::Tz;
 use hhmmss::Hhmmss;
 use indoc::formatdoc;
 use poise::{serenity_prelude as serenity, CreateReply};
-use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder};
+use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder, UserId};
 use tracing::{error, instrument};
 use uuid::Uuid;
 
@@ -155,11 +155,24 @@ pub async fn reply_cannot_start(ctx: Context<'_>) {
     .await;
 }
 
-#[instrument(skip(ctx))]
-pub async fn say_phase_finished(ctx: Context<'_>, finished: PhaseType, next: PhaseType) {
+#[instrument(skip(ctx, members))]
+pub async fn say_phase_finished<I, M>(
+    ctx: Context<'_>,
+    finished: PhaseType,
+    next: PhaseType,
+    members: I,
+) where
+    I: Iterator<Item = M>,
+    M: AsRef<UserId>,
+{
+    let mut mentions_builder = MessageBuilder::new();
+    for member in members {
+        mentions_builder.mention(member.as_ref());
+    }
+
     send_message(ctx, |avatar_url, message| {
         message
-            .content(MessageBuilder::new().mention(ctx.author()).build())
+            .content(mentions_builder.build())
             .embed(green_embed(avatar_url, |embed| {
                 embed
                     .title("Finished Phase")
@@ -215,6 +228,83 @@ pub async fn reply_status_no_session(ctx: Context<'_>) {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
             embed.title("No Session").description(
                 "Cannot get status because there is no running session in this channel.",
+            )
+        }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_joined(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply
+            .ephemeral(true)
+            .embed(green_embed(avatar_url, |embed| {
+                embed.title("Session Joined").description(
+                    "You will now be pinged when the phase changes. Use `/leave` to leave again.",
+                )
+            }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_join_already_member(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
+            embed
+                .title("Already a Member")
+                .description("You are already a member of this session. Use `/leave` to leave.")
+        }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_join_no_session(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
+            embed.title("No Session").description(
+                "Cannot join session because there is no running session in this channel.",
+            )
+        }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_left(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply
+            .ephemeral(true)
+            .embed(green_embed(avatar_url, |embed| {
+                embed.title("Session Left").description(
+                    "You will no longer be pinged when the phase changes. Use `/join` to join \
+                     again.",
+                )
+            }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_leave_not_member(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
+            embed
+                .title("Not a Member")
+                .description("You are not a member of this session. Use `/join` to join.")
+        }))
+    })
+    .await;
+}
+
+#[instrument(skip(ctx))]
+pub async fn reply_leave_no_session(ctx: Context<'_>) {
+    send_reply(ctx, |avatar_url, reply| {
+        reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
+            embed.title("No Session").description(
+                "Cannot leave session because there is no running session in this channel.",
             )
         }))
     })
