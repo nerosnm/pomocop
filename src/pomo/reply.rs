@@ -165,14 +165,15 @@ pub async fn say_phase_finished<I, M>(
     I: Iterator<Item = M>,
     M: AsRef<UserId>,
 {
-    let mut mentions_builder = MessageBuilder::new();
-    for member in members {
-        mentions_builder.mention(member.as_ref());
-    }
+    let mentions = members
+        .fold(&mut MessageBuilder::new(), |builder, member| {
+            builder.mention(member.as_ref()).push(" ")
+        })
+        .build();
 
     send_message(ctx, |avatar_url, message| {
         message
-            .content(mentions_builder.build())
+            .content(mentions.trim())
             .embed(green_embed(avatar_url, |embed| {
                 embed
                     .title("Finished Phase")
