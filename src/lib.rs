@@ -4,6 +4,7 @@ use poise::{
     serenity_prelude as serenity, EditTracker, ErrorContext, Framework, FrameworkOptions,
     PrefixFrameworkOptions,
 };
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use serenity::{ApplicationId, ChannelId, UserId};
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
@@ -21,6 +22,7 @@ pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, Error>;
 // Custom user data passed to all command functions
 pub struct Data {
     pub sessions: Mutex<HashMap<ChannelId, Session>>,
+    pub rng: Mutex<StdRng>,
     pub owner_id: serenity::UserId,
 }
 
@@ -59,6 +61,10 @@ pub async fn run(
             Box::pin(async move {
                 Ok(Data {
                     sessions: Mutex::new(HashMap::new()),
+                    rng: Mutex::new(
+                        StdRng::from_rng(thread_rng())
+                            .expect("unable to seed StdRng from ThreadRng"),
+                    ),
                     owner_id: UserId(owner_id.parse()?),
                 })
             })

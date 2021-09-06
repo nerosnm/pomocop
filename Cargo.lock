@@ -814,6 +814,7 @@ dependencies = [
  "hhmmss",
  "indoc",
  "poise",
+ "rand",
  "tap",
  "thiserror",
  "tokio",

@@ -195,7 +195,7 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(session) = ctx.data().sessions.lock().await.get_mut(&ctx.channel_id()) {
         match session.skip() {
-            Ok(()) => reply_skipping_phase(ctx).await,
+            Ok(skipped_type) => reply_skipping_phase(ctx, skipped_type).await,
             Err(SessionError::NotActive) => reply_skip_failed(ctx, session.id()).await,
         }
     } else {

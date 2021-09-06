@@ -1,8 +1,11 @@
+use std::ops::Deref;
+
 use chrono::{DateTime, Duration, Utc};
 use chrono_tz::Tz;
 use hhmmss::Hhmmss;
 use indoc::formatdoc;
 use poise::{serenity_prelude as serenity, CreateReply};
+use rand::seq::SliceRandom;
 use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder, UserId};
 use tracing::{error, instrument};
 use uuid::Uuid;
@@ -11,6 +14,8 @@ use crate::{
     pomo::session::{PhaseType, SessionConfig},
     Context,
 };
+
+pub mod phrases;
 
 const GREEN: Color = Color::from_rgb(29, 131, 41);
 const RED: Color = Color::from_rgb(205, 46, 2);
@@ -120,24 +125,35 @@ where
 
 #[instrument(skip(ctx))]
 pub async fn reply_starting(ctx: Context<'_>, config: &SessionConfig, id: Uuid) {
+    let mut rng = &mut *ctx.data().rng.lock().await;
+    let phrase = phrases::STARTING_SESSION
+        .choose(&mut rng)
+        .expect("the list of phrases is not empty")
+        .deref()
+        .to_owned();
+
     send_reply(ctx, |avatar_url, reply| {
-        reply.embed(green_embed(avatar_url, |embed| {
-            embed
-                .title("Starting Session")
-                .description(
-                    "This session will run until the `/stop` command is used. Use `/skip` to skip \
-                     the rest of the current phase and start the next one.",
-                )
-                .field("Work", format!("{} minutes", config.work), true)
-                .field("Short Break", format!("{} minutes", config.short), true)
-                .field("Long Break", format!("{} minutes", config.long), true)
-                .field(
-                    "Interval",
-                    format!("Every {} work phases", config.interval),
-                    false,
-                )
-                .field("Session ID", id, false)
-        }))
+        reply
+            .embed(green_embed(avatar_url, |embed| {
+                embed
+                    .title("Starting Session")
+                    .description(formatdoc! { "
+                        {}
+
+                        This session will run until the `/stop` command is used. Use `/skip` to skip the rest of the current phase and start the next one.
+                        ",
+                        phrase
+                    })
+                    .field("Work", format!("{} minutes", config.work), true)
+                    .field("Short Break", format!("{} minutes", config.short), true)
+                    .field("Long Break", format!("{} minutes", config.long), true)
+                    .field(
+                        "Interval",
+                        format!("Every {} work phases", config.interval),
+                        false,
+                    )
+                    .field("Session ID", id, false)
+            }))
     })
     .await;
 }
@@ -146,10 +162,12 @@ pub async fn reply_starting(ctx: Context<'_>, config: &SessionConfig, id: Uuid) 
 pub async fn reply_cannot_start(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.embed(red_embed(avatar_url, |embed| {
-            embed.title("Unable to Start Session").description(
-                "Only one session can be running in each channel at a time. Try running `/stop` \
-                 to stop the running session, or run this command again in a different channel.",
-            )
+            embed.title("Unable to Start Session").description(formatdoc! {"
+                Session is already running, now GET TO WORK.
+
+                Only one session can be running in each channel at a time. Try running `/stop` to stop the running session, or run this command again in a different channel.
+                 ",
+            })
         }))
     })
     .await;
@@ -171,18 +189,27 @@ pub async fn say_phase_finished<I, M>(
         })
         .build();
 
+    let phrases = match next {
+        PhaseType::Work(_) => phrases::STARTING_WORK,
+        PhaseType::Short(_) => phrases::STARTING_SHORT_BREAK,
+        PhaseType::Long(_) => phrases::STARTING_LONG_BREAK,
+    };
+
+    let mut rng = &mut *ctx.data().rng.lock().await;
+    let phrase = phrases
+        .choose(&mut rng)
+        .expect("the list of phrases is not empty")
+        .deref()
+        .to_owned();
+
     send_message(ctx, |avatar_url, message| {
         message
             .content(mentions.trim())
             .embed(green_embed(avatar_url, |embed| {
                 embed
-                    .title("Finished Phase")
-                    .description(format!(
-                        "Finished a {}. {}",
-                        finished.description(),
-                        finished.sentiment()
-                    ))
-                    .field("Starting Now", next.description(), false)
+                    .title(":rotating_light: WEE WOO :rotating_light: WEE WOO :rotating_light:")
+                    .description(format!("Starting a {}. {}", next.description(), phrase))
+                    .field("Just Finished", finished.description(), false)
             }))
     })
     .await;
@@ -227,9 +254,9 @@ pub async fn reply_status(
 pub async fn reply_status_no_session(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
-            embed.title("No Session").description(
-                "Cannot get status because there is no running session in this channel.",
-            )
+            embed
+                .title("No Session")
+                .description("I can't tell you the status of a session that doesn't exist, genius.")
         }))
     })
     .await;
@@ -253,9 +280,9 @@ pub async fn reply_joined(ctx: Context<'_>) {
 pub async fn reply_join_already_member(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
-            embed
-                .title("Already a Member")
-                .description("You are already a member of this session. Use `/leave` to leave.")
+            embed.title("Already a Member").description(
+                "You are already a member of this session, idiot. Use `/leave` to leave.",
+            )
         }))
     })
     .await;
@@ -266,7 +293,8 @@ pub async fn reply_join_no_session(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
             embed.title("No Session").description(
-                "Cannot join session because there is no running session in this channel.",
+                "You can't join a session if there is no session! I can see you're paying \
+                 attention...",
             )
         }))
     })
@@ -292,9 +320,9 @@ pub async fn reply_left(ctx: Context<'_>) {
 pub async fn reply_leave_not_member(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
-            embed
-                .title("Not a Member")
-                .description("You are not a member of this session. Use `/join` to join.")
+            embed.title("Not a Member").description(
+                "You are not a member of this session, bird-brain. Use `/join` to join.",
+            )
         }))
     })
     .await;
@@ -304,19 +332,31 @@ pub async fn reply_leave_not_member(ctx: Context<'_>) {
 pub async fn reply_leave_no_session(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.ephemeral(true).embed(red_embed(avatar_url, |embed| {
-            embed.title("No Session").description(
-                "Cannot leave session because there is no running session in this channel.",
-            )
+            embed
+                .title("No Session")
+                .description("Nice try, there has to be a session running for you to leave it.")
         }))
     })
     .await;
 }
 
 #[instrument(skip(ctx))]
-pub async fn reply_skipping_phase(ctx: Context<'_>) {
+pub async fn reply_skipping_phase(ctx: Context<'_>, skipped: PhaseType) {
+    let phrases = match skipped {
+        PhaseType::Work(_) => phrases::SKIPPING_WORK,
+        PhaseType::Short(_) | PhaseType::Long(_) => phrases::SKIPPING_BREAK,
+    };
+
+    let mut rng = &mut *ctx.data().rng.lock().await;
+    let phrase = phrases
+        .choose(&mut rng)
+        .expect("the list of phrases is not empty")
+        .deref()
+        .to_owned();
+
     send_reply(ctx, |avatar_url, reply| {
         reply.embed(no_footer(green_embed(avatar_url, |embed| {
-            embed.description("Skipping phase...")
+            embed.description(format!("Skipping {}. {}", skipped.description(), phrase))
         })))
     })
     .await;
@@ -344,9 +384,9 @@ pub async fn reply_skip_failed(ctx: Context<'_>, id: Uuid) {
 pub async fn reply_skip_no_session(ctx: Context<'_>) {
     send_reply(ctx, |avatar_url, reply| {
         reply.embed(red_embed(avatar_url, |embed| {
-            embed
-                .title("Failed to Skip Phase")
-                .description("There is no running session in this channel!")
+            embed.title("Failed to Skip Phase").description(
+                "I'm not even running a session and you're already trying to get out of work?",
+            )
         }))
     })
     .await;
@@ -386,7 +426,7 @@ pub async fn reply_stop_no_session(ctx: Context<'_>) {
         reply.embed(red_embed(avatar_url, |embed| {
             embed
                 .title("Failed to Stop Session")
-                .description("There is no running session in this channel!")
+                .description("Trying to quit before you've even started?")
         }))
     })
     .await;
@@ -394,11 +434,16 @@ pub async fn reply_stop_no_session(ctx: Context<'_>) {
 
 #[instrument(skip(ctx))]
 pub async fn say_session_stopped(ctx: Context<'_>) {
+    let mut rng = &mut *ctx.data().rng.lock().await;
+    let phrase = phrases::STOPPING_SESSION
+        .choose(&mut rng)
+        .expect("the list of phrases is not empty")
+        .deref()
+        .to_owned();
+
     send_message(ctx, |avatar_url, message| {
         message.embed(green_embed(avatar_url, |embed| {
-            embed
-                .title("Session Stopped")
-                .description("Thanks for using Pomocop!")
+            embed.title("Session Stopped").description(phrase)
         }))
     })
     .await;

@@ -105,15 +105,18 @@ impl Session {
     ///
     /// Returns [`SessionError::NotActive`] if there is no currently running
     /// phase, or if it was not possible to send the skip message (which likely
-    /// means that the phase finished on its own).
+    /// means that the phase finished on its own). If there was a currently
+    /// running phase, returns its type.
     #[instrument]
-    pub fn skip(&mut self) -> Result<(), SessionError> {
+    pub fn skip(&mut self) -> Result<PhaseType, SessionError> {
         if let Some(phase) = self.current_phase.take() {
             phase
                 .send
                 .send(PhaseMessage::Skip)
                 .tap_err(|_| warn!("unable to skip phase; did it complete on its own?"))
-                .or(Ok(()))
+                .ok();
+
+            Ok(phase.phase_type)
         } else {
             Err(SessionError::NotActive)
         }
@@ -457,15 +460,6 @@ impl PhaseType {
             PhaseType::Work(length) => format!("{} minute work session", length),
             PhaseType::Short(length) => format!("{} minute short break", length),
             PhaseType::Long(length) => format!("{} minute long break", length),
-        }
-    }
-
-    pub fn sentiment(&self) -> String {
-        match *self {
-            PhaseType::Work(_) => format!("Nice job!"),
-            PhaseType::Short(_) | PhaseType::Long(_) => {
-                format!("Back to work! Wee woo wee woo weewooweeweoowoewe!")
-            }
         }
     }
 }
