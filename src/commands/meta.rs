@@ -15,7 +15,9 @@ pub async fn help(
     poise::defaults::help(
         ctx,
         command.as_deref(),
-        "Pomocop is a tomato timer bot that isn't perpetually scuffed",
+        "Pomocop is a Discord tomato timer bot that aims to be robust, while also displaying the \
+         signature people-skills common to law enforcement officers, VC-backed techbros and \
+         everyone's least favourite teachers.",
         HelpResponseMode::Ephemeral,
     )
     .await?;

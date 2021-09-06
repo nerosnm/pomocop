@@ -1,6 +1,8 @@
 # Pomocop
 
-Pomocop is a Discord tomato timer bot that aims to be robust and user-friendly.
+Pomocop is a Discord tomato timer bot that aims to be robust, while also displaying the signature 
+people-skills common to law enforcement officers, VC-backed techbros and everyone's least favourite 
+teachers.
 
 ## Usage
 
