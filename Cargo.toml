@@ -1,7 +1,11 @@
 [package]
 name = "pomocop"
 version = "0.1.0"
+authors = [ "Søren Mortensen <soren@neros.dev>" ]
 edition = "2018"
+description = "Pomocop is a Discord tomato timer bot that aims to be robust, while also displaying the signature people-skills common to law enforcement officers, VC-backed techbros and everyone's least favourite teachers."
+license = "MIT/Apache-2.0"
+readme = "README.md"
 
 [dependencies]
 chrono = "0.4.19"
