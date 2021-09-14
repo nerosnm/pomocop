@@ -38,7 +38,7 @@
 
         src = ./.;
 
-        cargoSha256 = "sha256-vlJBmLgX43YLArm1dDkTtiBSiyL1C0cBAKBnwvklkOA=";
+        cargoSha256 = "sha256-GaUPVbWCE/GcvRxwXyOOkiv3eC8pb9bNmQckPDuToa0=";
 
         buildInputs = with pkgs; [
           sqlite
