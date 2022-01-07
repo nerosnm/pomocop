@@ -1,11 +1,11 @@
 use std::{collections::HashMap, time::Duration};
 
 use poise::{
-    serenity_prelude as serenity, EditTracker, ErrorContext, Framework, FrameworkOptions,
-    PrefixFrameworkOptions,
+    serenity_prelude::{self as serenity, UserId},
+    EditTracker, FrameworkBuilder, FrameworkError, FrameworkOptions, PrefixFrameworkOptions,
 };
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
-use serenity::{ApplicationId, ChannelId, UserId};
+use serenity::ChannelId;
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
 
@@ -28,36 +28,37 @@ pub struct Data {
 
 #[instrument(skip(token))]
 pub async fn run(
-    application_id: String,
+    _application_id: String,
     owner_id: String,
     prefix: String,
     token: String,
 ) -> Result<(), Error> {
     info!("starting pomocop");
 
-    let mut options = FrameworkOptions {
+    let options = FrameworkOptions {
         prefix_options: PrefixFrameworkOptions {
+            prefix: Some(prefix),
             edit_tracker: Some(EditTracker::for_timespan(Duration::from_secs(3600))),
             ..Default::default()
         },
-        on_error: |error, ctx| Box::pin(on_error(error, ctx)),
+        on_error: |error| Box::pin(on_error(error)),
+        commands: vec![
+            commands::meta::help(),
+            commands::meta::register(),
+            commands::pomo::start(),
+            commands::pomo::status(),
+            commands::pomo::join(),
+            commands::pomo::leave(),
+            commands::pomo::skip(),
+            commands::pomo::stop(),
+        ],
         ..Default::default()
     };
 
-    options.command(commands::meta::help(), |f| f);
-    options.command(commands::meta::register(), |f| f);
-
-    options.command(commands::pomo::start(), |f| f);
-    options.command(commands::pomo::status(), |f| f);
-    options.command(commands::pomo::join(), |f| f);
-    options.command(commands::pomo::leave(), |f| f);
-    options.command(commands::pomo::skip(), |f| f);
-    options.command(commands::pomo::stop(), |f| f);
-
-    let framework = Framework::new(
-        prefix,
-        ApplicationId(application_id.parse()?),
-        move |_ctx, _ready, _framework| {
+    let framework = FrameworkBuilder::<Data, Error>::default()
+        .options(options)
+        .token(token)
+        .user_data_setup(move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(Data {
                     sessions: Mutex::new(HashMap::new()),
@@ -68,22 +69,21 @@ pub async fn run(
                     owner_id: UserId(owner_id.parse()?),
                 })
             })
-        },
-        options,
-    );
-    framework
-        .start(serenity::ClientBuilder::new(&token))
+        })
+        .build()
         .await?;
+
+    framework.start().await?;
 
     Ok(())
 }
 
-pub async fn on_error(error: Error, ctx: ErrorContext<'_, Data, Error>) {
-    match ctx {
-        ErrorContext::Setup => panic!("failed to start bot: {:?}", error),
-        ErrorContext::Command(ctx) => {
-            error!(?error, command = %ctx.command().name(), "error in command")
+pub async fn on_error(error: FrameworkError<'_, Data, Error>) {
+    match error {
+        FrameworkError::Setup { error } => panic!("failed to start bot: {:?}", error),
+        FrameworkError::Command { error, ctx } => {
+            error!(?error, command = %ctx.command().name, "error in command")
         }
-        _ => error!(?error, "other error"),
+        _ => error!("other error"),
     }
 }

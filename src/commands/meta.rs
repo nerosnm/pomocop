@@ -1,7 +1,7 @@
-use poise::defaults::HelpResponseMode;
+use poise::builtins::HelpConfiguration;
 use tracing::{info, instrument};
 
-use crate::{Context, Error, PrefixContext};
+use crate::{Context, Error};
 
 /// Show this help menu
 #[instrument(skip(ctx))]
@@ -12,13 +12,16 @@ pub async fn help(
 ) -> Result<(), Error> {
     info!("sending help");
 
-    poise::defaults::help(
+    poise::builtins::help(
         ctx,
         command.as_deref(),
-        "Pomocop is a Discord tomato timer bot that aims to be robust, while also displaying the \
-         signature people-skills common to law enforcement officers, VC-backed techbros and \
-         everyone's least favourite teachers.",
-        HelpResponseMode::Ephemeral,
+        HelpConfiguration {
+            extra_text_at_bottom: "Pomocop is a Discord tomato timer bot that aims to be robust, \
+                                   while also displaying the signature people-skills common to \
+                                   law enforcement officers, VC-backed techbros and everyone's \
+                                   least favourite teachers.",
+            ..Default::default()
+        },
     )
     .await?;
     Ok(())
@@ -30,14 +33,14 @@ pub async fn help(
 /// register globally.
 #[instrument(skip(ctx))]
 #[poise::command(prefix_command, check = "is_owner", hide_in_help)]
-pub async fn register(ctx: PrefixContext<'_>, #[flag] global: bool) -> Result<(), Error> {
+pub async fn register(ctx: Context<'_>, #[flag] global: bool) -> Result<(), Error> {
     info!("registering slash commands");
 
-    poise::defaults::register_application_commands(ctx.into(), global).await?;
+    poise::builtins::register_application_commands(ctx.into(), global).await?;
 
     Ok(())
 }
 
-pub async fn is_owner(ctx: PrefixContext<'_>) -> Result<bool, Error> {
-    Ok(ctx.msg.author.id == ctx.data.owner_id)
+pub async fn is_owner(ctx: Context<'_>) -> Result<bool, Error> {
+    Ok(ctx.author().id == ctx.data().owner_id)
 }
