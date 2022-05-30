@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use poise::{
-    serenity_prelude::{self as serenity, UserId},
+    serenity_prelude::{self as serenity, GatewayIntents, UserId},
     EditTracker, FrameworkBuilder, FrameworkError, FrameworkOptions, PrefixFrameworkOptions,
 };
 use rand::{rngs::StdRng, thread_rng, SeedableRng};
@@ -58,6 +58,7 @@ pub async fn run(
     let framework = FrameworkBuilder::<Data, Error>::default()
         .options(options)
         .token(token)
+        .intents(GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
         .user_data_setup(move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(Data {
