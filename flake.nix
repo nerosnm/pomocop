@@ -85,6 +85,7 @@
 
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
+          cargo2nix
           libiconv
           nixpkgs-fmt
           rust-toolchain
