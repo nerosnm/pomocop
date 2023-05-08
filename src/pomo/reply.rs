@@ -4,7 +4,10 @@ use chrono::{DateTime, Duration, Utc};
 use chrono_tz::Tz;
 use hhmmss::Hhmmss;
 use indoc::formatdoc;
-use poise::{serenity_prelude as serenity, CreateReply};
+use poise::{
+    serenity_prelude::{self as serenity, CacheHttp},
+    CreateReply,
+};
 use rand::seq::SliceRandom;
 use serenity::{Color, CreateEmbed, CreateMessage, MessageBuilder, UserId};
 use tracing::{error, instrument};
@@ -84,8 +87,7 @@ where
 /// found. If it couldn't be found, just returns `None` because I can't be
 /// bothered.
 async fn get_avatar_url(ctx: Context<'_>) -> Option<String> {
-    ctx.discord()
-        .http
+    ctx.http()
         .get_current_user()
         .await
         .ok()
@@ -113,9 +115,7 @@ where
 
     let result = ctx
         .channel_id()
-        .send_message(&ctx.discord().http, |message| {
-            make_builder(avatar_url, message)
-        })
+        .send_message(&ctx.http(), |message| make_builder(avatar_url, message))
         .await;
 
     if let Err(error) = result {

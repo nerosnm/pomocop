@@ -20,6 +20,7 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 pub type PrefixContext<'a> = poise::PrefixContext<'a, Data, Error>;
 
 // Custom user data passed to all command functions
+#[derive(Debug)]
 pub struct Data {
     pub sessions: Mutex<HashMap<ChannelId, Session>>,
     pub rng: Mutex<StdRng>,
@@ -59,7 +60,7 @@ pub async fn run(
         .options(options)
         .token(token)
         .intents(GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
-        .user_data_setup(move |_ctx, _ready, _framework| {
+        .setup(move |_ctx, _ready, _framework| {
             Box::pin(async move {
                 Ok(Data {
                     sessions: Mutex::new(HashMap::new()),
@@ -81,10 +82,10 @@ pub async fn run(
 
 pub async fn on_error(error: FrameworkError<'_, Data, Error>) {
     match error {
-        FrameworkError::Setup { error } => panic!("failed to start bot: {:?}", error),
-        FrameworkError::Command { error, ctx } => {
+        FrameworkError::Command { ctx, .. } => {
             error!(?error, command = %ctx.command().name, "error in command")
         }
-        _ => error!("other error"),
+        FrameworkError::Setup { .. } => panic!("failed to start bot: {:?}", error),
+        _ => error!("other error: {:?}", error),
     }
 }
